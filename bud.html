@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Bdgt</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 20px;
+        }
+
+        body,
+        input,
+        select,
+        button {
+            letter-spacing: 1.5px;
+            font-family: 'Helvetica', sans-serif;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: rgba(75, 192, 192, 1);
+            /* light blue */
+            text-transform: uppercase;
+            letter-spacing: 8px;
+        }
+
+        h3 {
+            font-size: 1.5rem;
+            margin-top: 20px;
+            margin-bottom: 15px;
+            color: rgba(173, 216, 230, 1);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+
+        #container {
+            max-width: 800px;
+            margin: auto;
+        }
+
+        ul#itemList li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px solid #ccc;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        ul#itemList li.income {
+            background-color: rgba(173, 216, 230, 0.3);
+        }
+
+        ul#itemList li.expense {
+            background-color: rgba(255, 228, 225, 0.3);
+        }
+
+        ul#itemList li:hover {
+            background-color: #f1f1f1;
+        }
+
+        input[type="number"],
+        input[type="text"],
+        select {
+            width: 200px;
+            padding: 10px;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 12px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: rgba(173, 216, 230, 1);
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 12px;
+            font-size: 1rem;
+        }
+
+        .table-container button {
+            background-color: rgba(255, 208, 205, 0.9);
+        }
+
+        .table-container button:hover {
+            background-color: rgba(255, 228, 225, 1);
+        }
+
+        .table-container {
+            width: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .table-container table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table-container th,
+        .table-container td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .table-container tr:last-child td {
+            border-bottom: none;
+        }
+
+        .table-container th {
+            background-color: #f4f4f4;
+        }
+
+        .table-container tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        .type-highlight {
+            font-weight: bold;
+            color: #333;
+        }
+
+        /* Evenly distribute table column width */
+        .table-container td,
+        .table-container th {
+            width: 20%;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        #exportString,
+        #importString {
+            font-size: 18px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            /* Wraps text and preserves newlines and spaces */
+            word-wrap: break-word;
+            /* Allows long words to be broken and wrap onto the next line */
+        }
+
+        #exportModal,
+        #importModal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 30%;
+            height: 30%;
+            margin: 40 auto;
+            padding: 5%;
+            transform: translate(-50%, -50%);
+            /* Adjust for exact centering */
+            background-color: #f4f4f4;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .importExport {
+            margin-bottom: 5px;
+        }
+
+        .modal-content {
+            text-align: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        textarea {
+            resize: none;
+            width: 100%;
+            height: 200px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container">
+        <h1>BDGT</h1>
+
+        <h3>Income</h3>
+        <input type="number" id="incomeAmount" placeholder="Amount">
+        <select id="incomeDay">
+            <option value="Mon">Monday</option>
+            <option value="Tue">Tuesday</option>
+            <option value="Wed">Wednesday</option>
+            <option value="Thu">Thursday</option>
+            <option value="Fri">Friday</option>
+            <option value="Sat">Saturday</option>
+            <option value="Sun">Sunday</option>
+        </select>
+        <input type="text" id="incomeLabel" placeholder="Label (Optional)">
+        <button onclick="addIncome()">Add</button>
+
+        <h3>Expenses</h3>
+        <input type="number" id="expenseAmount" placeholder="Amount">
+        <select id="expenseCategory">
+            <option value="Rent">Rent</option>
+            <option value="Bills">Bills</option>
+            <option value="Groceries">Groceries</option>
+            <option value="Transportation">Transportation</option>
+            <option value="Insurance">Insurance</option>
+            <option value="Subscriptions">Subscriptions</option>
+            <option value="PetCare">Pet Care</option>
+        </select>
+        <input type="text" id="expenseLabel" placeholder="Label (Optional)">
+        <button onclick="addExpense()">Add</button>
+
+        <h3>Summary</h3>
+        <p><strong>This Month's Balance:</strong> $<span id="monthlyBalance">0</span></p>
+        <p><strong>Avg Monthly Income:</strong> $<span id="avgMonthlyIncome">0</span></p>
+        <p><strong>Avg Monthly Expenses:</strong> $<span id="avgMonthlyExpenses">0</span></p>
+        <p><strong>Avg Net Monthly Gain:</strong> $<span id="netMonthlyGain">0</span></p>
+
+
+        <h3>Monthly Balance Sheet</h3>
+        <!-- Export Modal -->
+        <div id="exportModal" class="modal">
+            <h2>Export Your Data</h2>
+            <p>Please copy the following code and save it.</p>
+            <textarea id="exportString" readonly onclick="this.select()" style="max-width: 500px;"></textarea>
+            <button onclick="closeExportModal()">Close</button>
+        </div>
+
+        <!-- Import Modal -->
+        <div id="importModal" class="modal">
+            <h2>Import Your Data</h2>
+            <p>Please copy in your export code.</p>
+            <textarea id="importString" style="max-width: 500px;"></textarea>
+            <button onclick="importData()">Import</button>
+            <button onclick="closeImportModal()">Close</button>
+            </button>
+        </div>
+
+        <!-- Export & Import Buttons -->
+        <button class="importExport" onclick="openExportModal()">Export</button>
+        <button class="importExport" onclick="openImportModal()">Import</button>
+
+        <div class="table-container">
+            <table id="itemsTable">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Detail</th>
+                        <th>Label</th>
+                    </tr>
+                </thead>
+                <tbody id="itemsList">
+                    <!-- Items will go here -->
+                </tbody>
+            </table>
+        </div>
+
+        <h3>Trend Graph (12 months)</h3>
+        <canvas id="trendGraph" width="400" height="200"></canvas>
+
+        <h3>Expense Categories</h3>
+        <canvas id="categoryPie" width="400" height="200"></canvas>
+    </div>
+
+    <script>
+        let incomeDetails = [];
+        let individualExpenses = [];
+        let monthlyExpenses = 0;
+        let trendData = [];
+        let trendChart;
+        let pieChart;
+        let expenseCategories = {};
+        let runningBalance = 0;
+
+        function weekdaysInMonth(day, month, year) {
+            const dayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            let count = 0;
+            for (let i = 1; i <= daysInMonth; i++) {
+                const currentDay = new Date(year, month, i).getDay();
+                if (currentDay === dayMap[day]) {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        function updateSummary() {
+            updateTrend = true;
+            if (incomeDetails.length === 0 && monthlyExpenses === 0) {
+                if (trendChart) {
+                    trendChart.destroy();
+                }
+                document.getElementById('monthlyBalance').innerText = 0; // Reset the balance text to 0
+                updateTrend = false;
+            }
+
+            runningBalance = 0;
+            const today = new Date();
+            const incomeThisMonth = incomeDetails.reduce((sum, { amount, day }) => {
+                return sum + (weekdaysInMonth(day, today.getMonth(), today.getFullYear()) * amount);
+            }, 0);
+
+            // Calculate the total weekly income
+            const totalWeeklyIncome = incomeDetails.reduce((sum, { amount }) => {
+                return sum + amount;
+            }, 0);
+            const avgMonthlyIncome = (totalWeeklyIncome * 52) / 12;
+
+            const balance = incomeThisMonth - monthlyExpenses;
+            runningBalance = balance;  // Update the runningBalance
+            document.getElementById('monthlyBalance').innerText = balance; // Update the balance shown on the page
+            document.getElementById('monthlyBalance').innerText = balance;
+            document.getElementById('avgMonthlyIncome').innerText = avgMonthlyIncome.toFixed(2);
+            document.getElementById('avgMonthlyExpenses').innerText = monthlyExpenses.toFixed(2);
+            document.getElementById('netMonthlyGain').innerText = (avgMonthlyIncome - monthlyExpenses).toFixed(2);
+
+            if (updateTrend) {
+                updateTrendGraph();
+            }
+        }
+
+        function updateTrendGraph() {
+            if (trendChart) {
+                trendChart.destroy();
+            }
+
+            const today = new Date();
+            trendData = [];
+            let incomeData = [];  // For storing income for each month
+            let expenseData = []; // For storing expenses for each month
+            let futureDate = new Date(today);
+            let accumulatedBalance = 0;
+
+            for (let i = 0; i < 12; i++) {
+                const incomeThisMonth = incomeDetails.reduce((sum, { amount, day }) => {
+                    return sum + (weekdaysInMonth(day, futureDate.getMonth(), futureDate.getFullYear()) * amount);
+                }, 0);
+
+                const futureBalance = incomeThisMonth - monthlyExpenses;
+
+                // Store income and expenses data
+                incomeData.push(incomeThisMonth);
+                expenseData.push(-monthlyExpenses);
+
+                accumulatedBalance += futureBalance;
+                trendData.push(accumulatedBalance);
+
+                futureDate.setMonth(futureDate.getMonth() + 1);
+            }
+
+            const isNegativeTotal = trendData.some(value => value < 0);
+            const ctx = document.getElementById('trendGraph').getContext('2d');
+            trendChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Array.from({ length: 12 }, (_, i) => new Date(today.getFullYear(), today.getMonth() + i).toLocaleString('default', { month: 'long' })),
+                    datasets: [{
+                        label: 'Income',
+                        data: incomeData,
+                        backgroundColor: 'rgba(75, 192, 192, 0.3)',
+                        stack: 'Stack 0'
+                    }, {
+                        label: 'Expenses',
+                        data: expenseData,
+                        backgroundColor: 'rgba(255, 99, 132, 0.3)',
+                        stack: 'Stack 0'
+                    }, {
+                        label: 'Balance Trend',
+                        data: trendData,
+                        type: 'line',
+                        borderColor: isNegativeTotal ? 'rgba(255, 228, 225, 1)' : 'rgba(173, 216, 230, 1)',
+                        borderWidth: 2,
+                        fill: false,
+                        yAxisID: 'y-axis-2'
+                    }],
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            stacked: false,
+                            title: {
+                                display: true,
+                                text: 'Income/Expenses (Bars)'
+                            },
+                            grid: {
+                                drawOnChartArea: false  // Remove grid lines
+                            }
+                        },
+                        'y-axis-2': {
+                            position: 'right',
+                            beginAtZero: true,
+                            stacked: false,
+                            title: {
+                                display: true,
+                                text: 'Balance Trend (Line)'
+                            },
+                            grid: {
+                                drawOnChartArea: false  // Remove grid lines
+                            }
+                        },
+                        x: {
+                            beginAtZero: true,
+                            stacked: true,
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true
+                        }
+                    }
+                },
+            });
+        }
+
+        function addToList(type, amount, detail, cssClass, label = '') {
+            if (isNaN(amount)) return;
+            const listElement = document.createElement('tr');
+
+            // Create table cells and add the content
+            const typeCell = document.createElement('td');
+            typeCell.innerText = type;
+            const amountCell = document.createElement('td');
+            amountCell.innerText = `$${amount}`;
+            const detailCell = document.createElement('td');
+            detailCell.innerText = detail;
+            const labelCell = document.createElement('td');
+            labelCell.innerText = label;
+
+            const actionCell = document.createElement('td');
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerText = 'Delete';
+
+            deleteBtn.addEventListener('click', function () {
+                listElement.remove();
+                if (type === 'Income') {
+                    let removed = false;
+                    incomeDetails = incomeDetails.filter(item => {
+                        if (!removed && item.amount === amount && item.day === detail) {
+                            removed = true;
+                            return false;
+                        }
+                        return true;
+                    });
+                } else {
+                    monthlyExpenses -= amount;
+                    individualExpenses = individualExpenses.filter(item => {  // Assuming individualExpenses exists
+                        return !(item.amount === amount && item.category === detail && item.label === label);
+                    });
+                    expenseCategories[detail].amount -= amount;
+                    if (expenseCategories[detail].amount <= 0) {
+                        delete expenseCategories[detail];
+                    }
+                }
+                updateSummary();  // Update the summary
+                updateCategoryPie();
+            });
+
+
+            actionCell.appendChild(deleteBtn);
+
+            // Append cells to the row
+            listElement.appendChild(typeCell);
+            listElement.appendChild(amountCell);
+            listElement.appendChild(detailCell);
+            listElement.appendChild(labelCell);
+            listElement.appendChild(actionCell);
+
+            // Add class to the row
+            if (cssClass) {
+                listElement.classList.add(cssClass);
+            }
+
+            // Append row to the table body
+            document.getElementById('itemsList').appendChild(listElement);
+        }
+
+        // Declare pieChart at the top of your script
+
+        function updateCategoryPie() {
+            if (pieChart) {
+                pieChart.destroy();  // Always destroy the old chart before drawing a new one
+            }
+
+            if (Object.keys(expenseCategories).length === 0) {
+                return;
+            }
+
+            const ctx = document.getElementById('categoryPie').getContext('2d');
+            pieChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(expenseCategories),
+                    datasets: [{
+                        data: Object.values(expenseCategories).map(item => item.amount),
+                        backgroundColor: ['rgba(173, 216, 230, 1)', 'rgba(255, 228, 225, 1)', 'rgba(144, 238, 144, 1)', 'rgba(255, 222, 173, 1)', 'rgba(135, 206, 250, 1)', 'rgba(255, 165, 0, 1)', 'rgba(221, 160, 221, 1)', 'rgba(176, 224, 230, 1)', 'rgba(255, 192, 203, 1)']
+                    }],
+                },
+            });
+        }
+
+        function addIncome() {
+            const amount = parseFloat(document.getElementById('incomeAmount').value);
+            if (isNaN(amount)) return;  // Added this line to prevent empty or invalid input
+            const day = document.getElementById('incomeDay').value;
+            const label = document.getElementById('incomeLabel').value; // Optional label
+
+            incomeDetails.push({ amount, day, label });
+            addToList('Income', amount, day, 'income', label);
+            updateSummary();
+        }
+
+        function addExpense() {
+            const amount = parseFloat(document.getElementById('expenseAmount').value);
+            if (isNaN(amount)) return;  // To prevent empty or invalid input
+            const category = document.getElementById('expenseCategory').value;
+            const label = document.getElementById('expenseLabel').value; // Optional label
+
+            monthlyExpenses += amount;
+
+            expenseCategories[category] = (expenseCategories[category] || { amount: 0, label: '' });
+            expenseCategories[category].amount += amount;
+            expenseCategories[category].label = label;
+
+            addToList('Expense', amount, category, 'expense', label);
+            individualExpenses.push({ amount, category, label });
+            updateSummary();
+            updateCategoryPie();
+        }
+
+        //// IMPORT EXPORT CODE
+
+        // Open export modal and populate textarea
+        function openExportModal() {
+            const base64String = exportData();
+            const exportString = document.getElementById('exportString');
+            exportString.focus();
+            exportString.select();
+            document.getElementById('exportString').innerText = base64String;
+            document.getElementById('exportModal').style.display = "block";
+        }
+
+        // Close export modal
+        function closeExportModal() {
+            document.getElementById('exportModal').style.display = "none";
+        }
+
+        // Open import modal
+        function openImportModal() {
+            document.getElementById('importModal').style.display = "block";
+            document.getElementById('importString').focus();  // Focus on the pre
+        }
+
+        // Close import modal
+        function closeImportModal() {
+            document.getElementById('importModal').style.display = "none";
+        }
+
+        // Import data from textarea
+        function importData() {
+            const base64String = document.getElementById('importString').value;
+            try {
+                if (base64String) {
+                    importDataB64(base64String); // Assuming you have a function named importData
+                }
+            } catch (e) {
+                alert("Invalid or corrupted Base64 string."); // Inform the user
+            }
+            closeImportModal();
+        }
+
+        function exportData() {
+            const data = {
+                incomeDetails,
+                monthlyExpenses,
+                individualExpenses,
+            };
+            const jsonString = JSON.stringify(data);
+            const base64String = btoa(jsonString);
+            return base64String;
+        }
+
+        function importDataB64(base64String) {
+
+            const jsonString = atob(base64String);
+            const data = JSON.parse(jsonString);
+
+            incomeDetails = data.incomeDetails || [];
+            monthlyExpenses = data.monthlyExpenses || 0;
+            individualExpenses = data.individualExpenses || [];
+
+            // Clear existing rows from the table, if needed
+            const tableBody = document.getElementById('itemsList');
+            while (tableBody.firstChild) {
+                tableBody.removeChild(tableBody.firstChild);
+            }
+
+            // Repopulate income details in the list
+            incomeDetails.forEach(({ amount, day, label }) => {
+                addToList('Income', amount, day, 'income', label);
+            });
+
+            // Repopulate expense categories in the list
+            individualExpenses.forEach(({ amount, category, label }) => {  // Modify this loop
+                addToList('Expense', amount, category, 'expense', label);
+            });
+
+            // Update summary and pie chart
+            updateSummary();
+            updateCategoryPie();
+        }
+    </script>
+</body>
+
+</html>
