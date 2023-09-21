@@ -196,7 +196,8 @@
         <h1>BDGT</h1>
 
         <h3>Income</h3>
-        <input type="number" id="incomeAmount" placeholder="Amount">
+        <input type="number" id="incomeAmount" placeholder="Amount"
+            title="Enter your weekly income amount here. If the income is bi-weekly, divide the number by 2 before input.">
         <select id="incomeDay">
             <option value="Mon">Monday</option>
             <option value="Tue">Tuesday</option>
@@ -214,6 +215,7 @@
         <select id="expenseCategory">
             <option value="Rent">Rent</option>
             <option value="Bills">Bills</option>
+            <option value="Savings">Savings</option>
             <option value="Groceries">Groceries</option>
             <option value="Transportation">Transportation</option>
             <option value="Insurance">Insurance</option>
@@ -222,6 +224,11 @@
         </select>
         <input type="text" id="expenseLabel" placeholder="Label (Optional)">
         <button onclick="addExpense()">Add</button>
+
+        <h3>One-Time Expenses</h3>
+        <input type="number" id="oneTimeExpenseAmount" placeholder="Amount">
+        <input type="text" id="oneTimeExpenseLabel" placeholder="Label (Optional)">
+        <button onclick="addOneTimeExpense()">Add One-Time Expense</button>
 
         <h3>Summary</h3>
         <p><strong>This Month's Balance:</strong> $<span id="monthlyBalance">0</span></p>
@@ -285,6 +292,7 @@
         let pieChart;
         let expenseCategories = {};
         let runningBalance = 0;
+        let oneTimeExpenses = [];
 
         function weekdaysInMonth(day, month, year) {
             const dayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
@@ -301,11 +309,11 @@
 
         function updateSummary() {
             updateTrend = true;
-            if (incomeDetails.length === 0 && monthlyExpenses === 0) {
+            if (incomeDetails.length === 0 && monthlyExpenses === 0 && oneTimeExpenses.length === 0) {
                 if (trendChart) {
                     trendChart.destroy();
                 }
-                document.getElementById('monthlyBalance').innerText = 0; // Reset the balance text to 0
+                document.getElementById('monthlyBalance').innerText = 0;
                 updateTrend = false;
             }
 
@@ -321,10 +329,11 @@
             }, 0);
             const avgMonthlyIncome = (totalWeeklyIncome * 52) / 12;
 
-            const balance = incomeThisMonth - monthlyExpenses;
-            runningBalance = balance;  // Update the runningBalance
+            const totalOneTimeExpenses = oneTimeExpenses.reduce((sum, { amount }) => {
+                return sum + amount;
+            }, 0);
+            const balance = incomeThisMonth - monthlyExpenses - totalOneTimeExpenses;
             document.getElementById('monthlyBalance').innerText = balance; // Update the balance shown on the page
-            document.getElementById('monthlyBalance').innerText = balance;
             document.getElementById('avgMonthlyIncome').innerText = avgMonthlyIncome.toFixed(2);
             document.getElementById('avgMonthlyExpenses').innerText = monthlyExpenses.toFixed(2);
             document.getElementById('netMonthlyGain').innerText = (avgMonthlyIncome - monthlyExpenses).toFixed(2);
@@ -332,6 +341,85 @@
             if (updateTrend) {
                 updateTrendGraph();
             }
+        }
+
+        function addToList(type, amount, detail, cssClass, label = '') {
+            if (isNaN(amount)) return;
+            const listElement = document.createElement('tr');
+
+            // Create table cells and add the content
+            const typeCell = document.createElement('td');
+            typeCell.innerText = type;
+            const amountCell = document.createElement('td');
+            amountCell.innerText = `$${amount}`;
+            const detailCell = document.createElement('td');
+            detailCell.innerText = detail;
+            const labelCell = document.createElement('td');
+            labelCell.innerText = label;
+
+            const actionCell = document.createElement('td');
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerText = 'Delete';
+
+            deleteBtn.addEventListener('click', function () {
+                listElement.remove();
+                if (type === 'Income') {
+                    let removed = false;
+                    incomeDetails = incomeDetails.filter(item => {
+                        if (!removed && item.amount === amount && item.day === detail) {
+                            removed = true;
+                            return false;
+                        }
+                        return true;
+                    });
+                } else if (type === 'One-Time Expense') {
+                    let removed = false;
+                    oneTimeExpenses = oneTimeExpenses.filter(item => {
+                        if (!removed && item.amount === amount && item.label === label) {
+                            removed = true;
+                            return false;
+                        }
+                        return true;
+                    });
+                    if (removed) {
+                        if (expenseCategories['One-Time']) {
+                            expenseCategories['One-Time'].amount -= amount;
+                            if (expenseCategories['One-Time'].amount <= 0) {
+                                delete expenseCategories['One-Time'];
+                            }
+                        }
+                    }
+                } else {
+                    monthlyExpenses -= amount;
+                    individualExpenses = individualExpenses.filter(item => {
+                        return !(item.amount === amount && item.category === detail && item.label === label);
+                    });
+                    expenseCategories[detail].amount -= amount;
+                    if (expenseCategories[detail].amount <= 0) {
+                        delete expenseCategories[detail];
+                    }
+                }
+                updateSummary();  // Update the summary
+                updateCategoryPie();
+            });
+
+
+            actionCell.appendChild(deleteBtn);
+
+            // Append cells to the row
+            listElement.appendChild(typeCell);
+            listElement.appendChild(amountCell);
+            listElement.appendChild(detailCell);
+            listElement.appendChild(labelCell);
+            listElement.appendChild(actionCell);
+
+            // Add class to the row
+            if (cssClass) {
+                listElement.classList.add(cssClass);
+            }
+
+            // Append row to the table body
+            document.getElementById('itemsList').appendChild(listElement);
         }
 
         function updateTrendGraph() {
@@ -346,16 +434,28 @@
             let futureDate = new Date(today);
             let accumulatedBalance = 0;
 
+            // One-time expenses are only counted against the first month.
+            const oteThisMonth = oneTimeExpenses.reduce((sum, { amount }) => {
+                return sum + amount;
+            }, 0);
+
             for (let i = 0; i < 12; i++) {
-                const incomeThisMonth = incomeDetails.reduce((sum, { amount, day }) => {
+                incomeThisMonth = incomeDetails.reduce((sum, { amount, day }) => {
                     return sum + (weekdaysInMonth(day, futureDate.getMonth(), futureDate.getFullYear()) * amount);
                 }, 0);
 
-                const futureBalance = incomeThisMonth - monthlyExpenses;
+                futureBalance = incomeThisMonth - monthlyExpenses;
 
                 // Store income and expenses data
+                if (i === 0 && oteThisMonth != 0) { // First month
+                    expensesAggregate = monthlyExpenses + oteThisMonth;
+                    expenseData.push(-expensesAggregate);
+                    futureBalance -= oteThisMonth;
+                }
+                else {
+                    expenseData.push(-monthlyExpenses);
+                }
                 incomeData.push(incomeThisMonth);
-                expenseData.push(-monthlyExpenses);
 
                 accumulatedBalance += futureBalance;
                 trendData.push(accumulatedBalance);
@@ -363,7 +463,8 @@
                 futureDate.setMonth(futureDate.getMonth() + 1);
             }
 
-            const isNegativeTotal = trendData.some(value => value < 0);
+            // colors the graph based on starting and ending trend line data points
+            const isNegativeTotal = (trendData[trendData.length - 1] <= trendData[0]);
             const ctx = document.getElementById('trendGraph').getContext('2d');
             trendChart = new Chart(ctx, {
                 type: 'bar',
@@ -428,70 +529,6 @@
             });
         }
 
-        function addToList(type, amount, detail, cssClass, label = '') {
-            if (isNaN(amount)) return;
-            const listElement = document.createElement('tr');
-
-            // Create table cells and add the content
-            const typeCell = document.createElement('td');
-            typeCell.innerText = type;
-            const amountCell = document.createElement('td');
-            amountCell.innerText = `$${amount}`;
-            const detailCell = document.createElement('td');
-            detailCell.innerText = detail;
-            const labelCell = document.createElement('td');
-            labelCell.innerText = label;
-
-            const actionCell = document.createElement('td');
-            const deleteBtn = document.createElement('button');
-            deleteBtn.innerText = 'Delete';
-
-            deleteBtn.addEventListener('click', function () {
-                listElement.remove();
-                if (type === 'Income') {
-                    let removed = false;
-                    incomeDetails = incomeDetails.filter(item => {
-                        if (!removed && item.amount === amount && item.day === detail) {
-                            removed = true;
-                            return false;
-                        }
-                        return true;
-                    });
-                } else {
-                    monthlyExpenses -= amount;
-                    individualExpenses = individualExpenses.filter(item => {  // Assuming individualExpenses exists
-                        return !(item.amount === amount && item.category === detail && item.label === label);
-                    });
-                    expenseCategories[detail].amount -= amount;
-                    if (expenseCategories[detail].amount <= 0) {
-                        delete expenseCategories[detail];
-                    }
-                }
-                updateSummary();  // Update the summary
-                updateCategoryPie();
-            });
-
-
-            actionCell.appendChild(deleteBtn);
-
-            // Append cells to the row
-            listElement.appendChild(typeCell);
-            listElement.appendChild(amountCell);
-            listElement.appendChild(detailCell);
-            listElement.appendChild(labelCell);
-            listElement.appendChild(actionCell);
-
-            // Add class to the row
-            if (cssClass) {
-                listElement.classList.add(cssClass);
-            }
-
-            // Append row to the table body
-            document.getElementById('itemsList').appendChild(listElement);
-        }
-
-        // Declare pieChart at the top of your script
-
         function updateCategoryPie() {
             if (pieChart) {
                 pieChart.destroy();  // Always destroy the old chart before drawing a new one
@@ -543,6 +580,27 @@
             updateCategoryPie();
         }
 
+        function addOneTimeExpense() {
+            const amount = parseFloat(document.getElementById('oneTimeExpenseAmount').value);
+            if (isNaN(amount)) return;
+            const label = document.getElementById('oneTimeExpenseLabel').value;
+            const category = 'One-Time';
+
+            expenseCategories[category] = (expenseCategories[category] || { amount: 0, label: '' });
+            expenseCategories[category].amount += amount;
+            expenseCategories[category].label = label;
+            oneTimeExpenses.push({ amount, category, label }); // Added this line to store one-time expenses
+
+
+            // Add to the list (UI)
+            addToList('One-Time Expense', amount, category, 'expense', label);
+
+            // Update the summary and pie chart
+            updateSummary();
+            updateCategoryPie();
+        }
+
+
         //// IMPORT EXPORT CODE
 
         // Open export modal and populate textarea
@@ -589,20 +647,23 @@
                 incomeDetails,
                 monthlyExpenses,
                 individualExpenses,
+                oneTimeExpenses
             };
+
             const jsonString = JSON.stringify(data);
             const base64String = btoa(jsonString);
             return base64String;
         }
 
         function importDataB64(base64String) {
-
             const jsonString = atob(base64String);
             const data = JSON.parse(jsonString);
 
             incomeDetails = data.incomeDetails || [];
             monthlyExpenses = data.monthlyExpenses || 0;
             individualExpenses = data.individualExpenses || [];
+            oneTimeExpenses = data.oneTimeExpenses || [];
+
 
             // Clear existing rows from the table, if needed
             const tableBody = document.getElementById('itemsList');
@@ -615,9 +676,21 @@
                 addToList('Income', amount, day, 'income', label);
             });
 
-            // Repopulate expense categories in the list
-            individualExpenses.forEach(({ amount, category, label }) => {  // Modify this loop
+            expenseCategories = {}; // Reset expenseCategories before repopulating
+
+            // Repopulate individual expenses and update expenseCategories
+            individualExpenses.forEach(({ amount, category, label }) => {
                 addToList('Expense', amount, category, 'expense', label);
+                expenseCategories[category] = (expenseCategories[category] || { amount: 0, label: '' });
+                expenseCategories[category].amount += amount;
+                expenseCategories[category].label = label;
+            });
+            // Repopulate one-time expenses and update expenseCategories
+            oneTimeExpenses.forEach(({ amount, category, label }) => {
+                addToList('One-Time Expense', amount, category, 'expense', label);
+                expenseCategories[category] = (expenseCategories[category] || { amount: 0, label: '' });
+                expenseCategories[category].amount += amount;
+                expenseCategories[category].label = label;
             });
 
             // Update summary and pie chart
