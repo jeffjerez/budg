@@ -161,15 +161,42 @@
             position: fixed;
             top: 50%;
             left: 50%;
+            max-width: 400px;
             width: 30%;
-            height: 30%;
-            margin: 40 auto;
-            padding: 5%;
             transform: translate(-50%, -50%);
-            /* Adjust for exact centering */
             background-color: #f4f4f4;
             border-radius: 8px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 21px;
+            box-sizing: border-box;
+        }
+
+        #exportModal {
+            height: 35%;
+        }
+
+        #importModal {
+            height: 38%;
+        }
+
+        @media only screen and (max-width: 768px) {
+
+            #exportModal,
+            #importModal {
+                top: 10%;
+                left: 50%;
+                width: 90%;
+                height: auto;
+                transform: translate(-50%, 0);
+            }
+        }
+
+        #exportModal textarea,
+        #exportModal button,
+        #importModal textarea,
+        #importModal button {
+            width: 100%;
+            margin-bottom: 10px;
         }
 
         .importExport {
@@ -360,6 +387,13 @@
             if (updateTrend) {
                 updateTrendGraph();
             }
+            const jsonString = JSON.stringify({
+                incomeDetails,
+                monthlyExpenses,
+                individualExpenses,
+                oneTimeExpenses
+            });
+            localStorage.setItem('bdgtData', jsonString);
         }
 
         function addToList(type, amount, detail, cssClass, label = '') {
@@ -452,6 +486,8 @@
             let expenseData = []; // For storing expenses for each month
             let futureDate = new Date(today);
             let accumulatedBalance = 0;
+            const isMobile = window.innerWidth <= 768;
+
 
             // One-time expenses are only counted against the first month.
             const oteThisMonth = oneTimeExpenses.reduce((sum, { amount }) => {
@@ -520,6 +556,9 @@
                             },
                             grid: {
                                 drawOnChartArea: false  // Remove grid lines
+                            },
+                            ticks: {
+                                fontSize: isMobile ? 6 : 12 // Adjust the font size
                             }
                         },
                         'y-axis-2': {
@@ -532,16 +571,27 @@
                             },
                             grid: {
                                 drawOnChartArea: false  // Remove grid lines
+                            },
+                            ticks: {
+                                fontSize: isMobile ? 6 : 12 // Adjust the font size
                             }
                         },
                         x: {
                             beginAtZero: true,
                             stacked: true,
+                            ticks: {
+                                fontSize: isMobile ? 6 : 12 // Adjust the font size
+                            }
                         }
                     },
                     plugins: {
                         legend: {
-                            display: true
+                            display: true,
+                            labels: {
+                                boxWidth: 10, // Make it a square
+                                boxHeight: 10, // Make it a square
+                                fontSize: isMobile ? 6 : 12 // Adjust the font size
+                            }
                         }
                     }
                 },
@@ -716,6 +766,51 @@
             updateSummary();
             updateCategoryPie();
         }
+        function loadFromLocalStorage() {
+            const savedData = localStorage.getItem('bdgtData');
+            if (savedData) {
+                const parsedData = JSON.parse(savedData);
+
+                incomeDetails = parsedData.incomeDetails || [];
+                monthlyExpenses = parsedData.monthlyExpenses || 0;
+                individualExpenses = parsedData.individualExpenses || [];
+                oneTimeExpenses = parsedData.oneTimeExpenses || [];
+
+                // Clear existing rows from the table
+                const tableBody = document.getElementById('itemsList');
+                while (tableBody.firstChild) {
+                    tableBody.removeChild(tableBody.firstChild);
+                }
+
+                // Repopulate income details in the list
+                incomeDetails.forEach(({ amount, day, label }) => {
+                    addToList('Income', amount, day, 'income', label);
+                });
+
+                expenseCategories = {}; // Reset expenseCategories before repopulating
+
+                // Repopulate individual expenses and update expenseCategories
+                individualExpenses.forEach(({ amount, category, label }) => {
+                    addToList('Expense', amount, category, 'expense', label);
+                    expenseCategories[category] = (expenseCategories[category] || { amount: 0, label: '' });
+                    expenseCategories[category].amount += amount;
+                    expenseCategories[category].label = label;
+                });
+
+                // Repopulate one-time expenses and update expenseCategories
+                oneTimeExpenses.forEach(({ amount, category, label }) => {
+                    addToList('One-Time Expense', amount, category, 'expense', label);
+                    expenseCategories[category] = (expenseCategories[category] || { amount: 0, label: '' });
+                    expenseCategories[category].amount += amount;
+                    expenseCategories[category].label = label;
+                });
+
+                // Update summary and pie chart
+                updateSummary();
+                updateCategoryPie();
+            }
+        }
+        loadFromLocalStorage();
     </script>
 </body>
 
